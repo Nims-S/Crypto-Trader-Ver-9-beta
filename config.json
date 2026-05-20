@@ -1,0 +1,23 @@
+{
+  "environment": "sandbox",
+  "debug": true,
+  "exchange": {
+    "api_key": "sandbox-api-key",
+    "secret_key": "sandbox-secret-key",
+    "rate_limit_ms": 100,
+    "sandbox": true
+  },
+  "persistence": {
+    "log_rotation_bytes": 134217728,
+    "snapshot_interval_seconds": 60,
+    "base_dir": "runtime_data"
+  },
+  "risk": {
+    "max_drawdown": 0.2,
+    "max_position_size": 1.0,
+    "blocked_assets": [
+      "LUNA",
+      "UST"
+    ]
+  }
+}
