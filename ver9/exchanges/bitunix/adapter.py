@@ -7,12 +7,34 @@ from ver9.events.execution_events import FillReceived
 from ver9.events.execution_events import OrderSubmitted
 from ver9.events.market_events import TradeEvent
 from ver9.exchanges.base.adapter import BaseExchangeAdapter
+from ver9.observability.logging import AsyncJsonLogger
+from ver9.observability.metrics import MetricsCollector
+from ver9.observability.tracing import TraceProvider
 from ver9.runtime.kernel.event_bus import EventBus
+from ver9.runtime.resilience.circuit_breaker import CircuitBreaker
+from ver9.runtime.resilience.rate_limiter import RateLimiter
 
 
 class BitunixAdapter(BaseExchangeAdapter):
-    def __init__(self, *, event_bus: EventBus) -> None:
-        super().__init__(exchange_name="bitunix", event_bus=event_bus)
+    def __init__(
+        self,
+        *,
+        event_bus: EventBus,
+        rate_limiter: RateLimiter | None = None,
+        circuit_breaker: CircuitBreaker | None = None,
+        logger: AsyncJsonLogger | None = None,
+        metrics: MetricsCollector | None = None,
+        trace_provider: TraceProvider | None = None,
+    ) -> None:
+        super().__init__(
+            exchange_name="bitunix",
+            event_bus=event_bus,
+            rate_limiter=rate_limiter,
+            circuit_breaker=circuit_breaker,
+            logger=logger,
+            metrics=metrics,
+            trace_provider=trace_provider,
+        )
 
     async def submit_order(self, event: OrderSubmitted) -> None:
         if not await self.rate_limiter.allow_request():

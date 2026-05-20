@@ -8,6 +8,9 @@ from ver9.events.execution_events import OrderAccepted
 from ver9.events.execution_events import OrderRejected
 from ver9.events.execution_events import OrderSubmitted
 from ver9.exchanges.base.adapter import BaseExchangeAdapter
+from ver9.observability.logging import AsyncJsonLogger
+from ver9.observability.metrics import MetricsCollector
+from ver9.observability.tracing import TraceProvider
 from ver9.runtime.kernel.event_bus import EventBus
 
 
@@ -18,10 +21,16 @@ class OrderManagementSystem:
         event_bus: EventBus,
         exchange_adapters: Mapping[str, BaseExchangeAdapter],
         default_exchange: str,
+        logger: AsyncJsonLogger | None = None,
+        metrics: MetricsCollector | None = None,
+        trace_provider: TraceProvider | None = None,
     ) -> None:
         self.event_bus = event_bus
         self.exchange_adapters = exchange_adapters
         self.default_exchange = default_exchange
+        self.logger = logger
+        self.metrics = metrics
+        self.trace_provider = trace_provider
 
     async def start(self) -> None:
         await self.event_bus.subscribe(
@@ -60,6 +69,12 @@ class OrderManagementSystem:
             return
 
         await adapter.submit_order(event)
+
+        if self.metrics is not None:
+            self.metrics.increment_counter(
+                "oms_orders_routed",
+                {"exchange": self.default_exchange},
+            )
 
     async def _on_order_accepted(self, event: RuntimeEvent) -> None:
         if not isinstance(event, OrderAccepted):

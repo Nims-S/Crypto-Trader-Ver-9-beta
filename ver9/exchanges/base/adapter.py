@@ -11,6 +11,9 @@ from ver9.events.execution_events import OrderAccepted
 from ver9.events.execution_events import OrderRejected
 from ver9.events.execution_events import OrderSubmitted
 from ver9.events.market_events import TradeEvent
+from ver9.observability.logging import AsyncJsonLogger
+from ver9.observability.metrics import MetricsCollector
+from ver9.observability.tracing import TraceProvider
 from ver9.runtime.kernel.event_bus import EventBus
 from ver9.runtime.resilience.circuit_breaker import CircuitBreaker
 from ver9.runtime.resilience.rate_limiter import RateLimiter
@@ -24,6 +27,9 @@ class BaseExchangeAdapter(ABC):
         event_bus: EventBus,
         rate_limiter: RateLimiter | None = None,
         circuit_breaker: CircuitBreaker | None = None,
+        logger: AsyncJsonLogger | None = None,
+        metrics: MetricsCollector | None = None,
+        trace_provider: TraceProvider | None = None,
     ) -> None:
         self.exchange_name = exchange_name
         self.event_bus = event_bus
@@ -32,6 +38,9 @@ class BaseExchangeAdapter(ABC):
             target_component=f"exchange:{exchange_name}",
             event_bus=event_bus,
         )
+        self.logger = logger
+        self.metrics = metrics
+        self.trace_provider = trace_provider
 
     async def publish_trade_payload(
         self,
@@ -44,6 +53,13 @@ class BaseExchangeAdapter(ABC):
             correlation_id=correlation_id or str(uuid4()),
         )
         await self.event_bus.publish(event)
+
+        if self.metrics is not None:
+            self.metrics.increment_counter(
+                "exchange_trade_events_published",
+                {"exchange": self.exchange_name},
+            )
+
         return event
 
     async def publish_fill_payload(
@@ -57,6 +73,13 @@ class BaseExchangeAdapter(ABC):
             correlation_id=correlation_id or str(uuid4()),
         )
         await self.event_bus.publish(event)
+
+        if self.metrics is not None:
+            self.metrics.increment_counter(
+                "exchange_fill_events_published",
+                {"exchange": self.exchange_name},
+            )
+
         return event
 
     async def publish_order_accepted(
