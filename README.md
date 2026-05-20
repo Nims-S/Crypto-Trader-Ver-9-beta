@@ -1,6 +1,214 @@
-﻿# Crypto-Trader-Ver-9 Beta
+# Crypto-Trader-Ver-9 Beta
 
-Clean beta infrastructure port for the Ver9 event-driven trading runtime.
+Clean beta infrastructure for the Ver9 event-driven algorithmic trading runtime.
 
-This repository intentionally omits legacy alpha coordinators, daemon managers,
-synthetic validation layers, and overlapping state/persistence paths.
+This repository is the architectural reset of the alpha Ver9 codebase. It removes legacy coordinator sprawl, duplicate persistence paths, mutable runtime dictionaries, synthetic validation debt, and overlapping state ownership.
+
+The beta runtime is organized around one rule:
+
+> Events are the only mutation pathway. `RuntimeStateStore` is the only source of truth.
+
+## Architecture Overview
+
+```text
+ver9/
+├── config/
+│   ├── settings.py
+│   └── schemas.py
+├── events/
+│   ├── base_event.py
+│   ├── market_events.py
+│   ├── execution_events.py
+│   ├── portfolio_events.py
+│   └── system_events.py
+├── runtime/
+│   ├── kernel/
+│   │   ├── event_bus.py
+│   │   └── runtime_kernel.py
+│   ├── state/
+│   │   ├── runtime_state_store.py
+│   │   └── state_models.py
+│   ├── persistence/
+│   │   ├── event_store.py
+│   │   ├── snapshot_store.py
+│   │   └── replay_engine.py
+│   ├── resilience/
+│   │   ├── rate_limiter.py
+│   │   └── circuit_breaker.py
+│   └── recovery/
+├── execution/
+│   └── oms.py
+├── exchanges/
+│   ├── base/
+│   ├── binance/
+│   ├── bybit/
+│   └── bitunix/
+├── portfolio/
+│   ├── allocation.py
+│   └── risk.py
+└── observability/
+    ├── logging.py
+    ├── metrics.py
+    └── tracing.py
+```
+
+## Event-Driven Topology
+
+All runtime communication flows through immutable event schemas in `ver9/events/`.
+
+Events are implemented as:
+
+```python
+@dataclass(frozen=True, slots=True)
+class RuntimeEvent:
+    event_id: str
+    timestamp_ns: int
+    correlation_id: str
+```
+
+Concrete event families include:
+
+- Market events: trades and order book updates.
+- Execution events: submitted, accepted, filled, rejected orders.
+- Portfolio events: allocation requests, risk breaches, reconciliation corrections.
+- System events: lifecycle transitions, heartbeats, circuit breaker trips.
+
+The runtime does not pass raw `dict[str, Any]` messages between subsystems. This prevents schema drift, replay ambiguity, and accidental mutation.
+
+## Single Source Of Truth
+
+`RuntimeStateStore` in `ver9/runtime/state/runtime_state_store.py` is the only authoritative runtime state owner.
+
+It tracks:
+
+- Order state by `order_id`.
+- Balances by asset.
+- Positions by symbol.
+- Last processed event sequence.
+
+External modules cannot mutate state directly. They can only emit typed events. The state store projects those events into frozen state models and exposes read-only snapshots.
+
+This boundary prevents divergence between:
+
+- OMS state
+- Exchange adapter state
+- Portfolio state
+- Reconciliation state
+- Recovery/replay state
+
+## Centralized Hierarchy
+
+`RuntimeKernel` is the only orchestrator.
+
+```text
+RuntimeKernel
+├── EventBus
+├── EventStore
+├── SnapshotStore
+├── ReplayEngine
+├── RuntimeStateStore
+├── ExchangeAdapters
+├── OMS
+└── Portfolio services
+```
+
+Startup lifecycle:
+
+```text
+1. Boot infrastructure components.
+2. Load latest atomic snapshot, if present.
+3. Hydrate RuntimeStateStore from snapshot.
+4. Replay sequenced events after the snapshot via ReplayEngine.
+5. Register priority infrastructure consumers.
+6. Register service consumers.
+7. Begin accepting typed runtime events.
+```
+
+Shutdown lifecycle:
+
+```text
+1. Capture current RuntimeStateSnapshot.
+2. Persist final atomic snapshot.
+3. Close the EventBus.
+4. Leave event logs ready for deterministic replay.
+```
+
+The event pipeline persists first, then projects state:
+
+```text
+Published RuntimeEvent
+    -> EventStore append with strict sequence
+    -> RuntimeStateStore projection
+    -> Service subscribers
+```
+
+This preserves deterministic recovery and prevents service-level side effects from outrunning durable persistence.
+
+## Persistence
+
+The persistence layer is canonical and compact:
+
+- `EventStore`: append-only sequenced JSONL event log.
+- `SnapshotStore`: atomic state snapshots using temp-file replacement.
+- `ReplayEngine`: deterministic reconstruction from historical events.
+
+Sequence tracking detects gaps or tampering and enables safe replay after the latest snapshot.
+
+## Resilience
+
+`ver9/runtime/resilience/` contains shared runtime resilience primitives:
+
+- `RateLimiter`
+- `CircuitBreaker`
+
+Circuit breakers emit typed `CircuitBreakerTripped` events through the event bus. They do not mutate global state directly.
+
+## Exchange Adapters
+
+Exchange adapters live under `ver9/exchanges/`.
+
+Adapters are responsible for:
+
+- Normalizing external websocket or REST payloads.
+- Converting payloads into typed Ver9 events.
+- Publishing those events to the `EventBus`.
+
+Adapters are not allowed to mutate `RuntimeStateStore`.
+
+## Local Installation
+
+Create and activate a virtual environment, then install in editable mode:
+
+```bash
+python -m venv .venv
+. .venv/Scripts/activate
+pip install -e .
+```
+
+For development tools:
+
+```bash
+pip install -e ".[dev]"
+```
+
+Run tests once added:
+
+```bash
+pytest
+```
+
+## Design Guarantees
+
+This beta repository intentionally enforces:
+
+- Immutable runtime events.
+- A single authoritative runtime state store.
+- Append-only sequenced persistence.
+- Deterministic replay.
+- Kernel-only orchestration.
+- Dependency-injected services.
+- No legacy daemon managers.
+- No synthetic validation layers in the runtime path.
+- No raw dictionary event messaging.
+
+The result is a cleaner, safer foundation for live event-driven trading.
