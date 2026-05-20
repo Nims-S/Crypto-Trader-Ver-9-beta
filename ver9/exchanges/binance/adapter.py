@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import hmac
 import json
@@ -12,70 +11,18 @@ from uuid import uuid4
 
 import aiohttp
 
-from ver9.events.execution_events import FillReceived
 from ver9.events.execution_events import OrderAccepted
 from ver9.events.execution_events import OrderRejected
 from ver9.events.execution_events import OrderSubmitted
+from ver9.events.execution_models import ExchangeExecutionResult
+from ver9.events.execution_models import ExchangeFillUpdate
+from ver9.events.execution_models import ExchangeOrderUpdate
 from ver9.exchanges.base.adapter import BaseExchangeAdapter
-
-
-class ExchangeExecutionResult:
-    def __init__(
-        self,
-        *,
-        exchange_order_id: str,
-        status: str,
-    ) -> None:
-        self.exchange_order_id = exchange_order_id
-        self.status = status
-
-
-class ExchangeOrderUpdate:
-    def __init__(
-        self,
-        *,
-        order_id: str,
-        exchange_order_id: str,
-        status: str,
-    ) -> None:
-        self.order_id = order_id
-        self.exchange_order_id = exchange_order_id
-        self.status = status
-
-
-class ExchangeFillUpdate:
-    def __init__(
-        self,
-        *,
-        order_id: str,
-        fill_id: str,
-        price: float,
-        quantity: float,
-        fee: float,
-        fee_asset: str,
-    ) -> None:
-        self.order_id = order_id
-        self.fill_id = fill_id
-        self.price = price
-        self.quantity = quantity
-        self.fee = fee
-        self.fee_asset = fee_asset
 
 
 class BinanceExchangeAdapter(BaseExchangeAdapter):
     """
     Production Binance Spot/Futures execution adapter.
-
-    Responsibilities:
-    - signed REST execution
-    - websocket lifecycle management
-    - execution report normalization
-    - resilient exchange connectivity
-
-    Non-Responsibilities:
-    - balance mutation
-    - position ownership
-    - runtime state management
     """
 
     def __init__(self, *args, **kwargs) -> None:
@@ -86,10 +33,6 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
         self._listen_key: str | None = None
 
     async def connect(self) -> None:
-        """
-        Establish authenticated Binance websocket session.
-        """
-
         self._http_session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=30),
         )
@@ -114,10 +57,6 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
         )
 
     async def disconnect(self) -> None:
-        """
-        Gracefully terminate Binance connections.
-        """
-
         self._connected = False
 
         if self._websocket is not None:
@@ -135,10 +74,6 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
         self,
         event: OrderSubmitted,
     ) -> ExchangeExecutionResult:
-        """
-        Submit signed Binance REST execution request.
-        """
-
         if self._http_session is None:
             raise RuntimeError("binance_http_session_not_initialized")
 
@@ -198,7 +133,7 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
                 error_type=type(exc).__name__,
             )
 
-            await self.event_bus.publish(
+            await self._event_bus.publish(
                 OrderRejected(
                     event_id=str(uuid4()),
                     timestamp_ns=time_ns(),
@@ -212,7 +147,7 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
 
         exchange_order_id = str(response_payload["orderId"])
 
-        await self.event_bus.publish(
+        await self._event_bus.publish(
             OrderAccepted(
                 event_id=str(uuid4()),
                 timestamp_ns=time_ns(),
@@ -222,9 +157,21 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
             )
         )
 
+        accepted_price = (
+            float(response_payload.get("price", 0.0))
+            if response_payload.get("price") is not None
+            else 0.0
+        )
+
         return ExchangeExecutionResult(
             exchange_order_id=exchange_order_id,
+            internal_order_id=event.order_id,
+            accepted_price=accepted_price,
+            timestamp_ns=time_ns(),
             status=str(response_payload.get("status", "NEW")),
+            position_side="BOTH",
+            reduce_only=False,
+            is_liquidation=False,
         )
 
     async def execution_stream(
@@ -232,10 +179,6 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
     ) -> AsyncIterator[
         ExchangeOrderUpdate | ExchangeFillUpdate
     ]:
-        """
-        Yield normalized Binance execution updates.
-        """
-
         if self._websocket is None:
             raise RuntimeError("binance_websocket_not_initialized")
 
@@ -256,21 +199,61 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
 
                 execution_type = str(payload.get("x", ""))
 
-                if execution_type in {"NEW", "CANCELED", "REPLACED"}:
+                cumulative_filled_quantity = float(
+                    payload.get("z", 0.0)
+                )
+
+                original_quantity = float(
+                    payload.get("q", 0.0)
+                )
+
+                remaining_quantity = max(
+                    original_quantity - cumulative_filled_quantity,
+                    0.0,
+                )
+
+                avg_price = float(payload.get("L", 0.0))
+
+                if execution_type in {
+                    "NEW",
+                    "CANCELED",
+                    "REPLACED",
+                    "REJECTED",
+                    "EXPIRED",
+                }:
                     yield ExchangeOrderUpdate(
-                        order_id=str(payload.get("c", "")),
                         exchange_order_id=str(payload.get("i", "")),
+                        internal_order_id=str(payload.get("c", "")),
                         status=str(payload.get("X", "")),
+                        cumulative_filled_quantity=cumulative_filled_quantity,
+                        remaining_quantity=remaining_quantity,
+                        avg_price=avg_price,
+                        reject_reason=(
+                            str(payload.get("r"))
+                            if payload.get("r") not in {None, "NONE"}
+                            else None
+                        ),
+                        position_side="BOTH",
+                        reduce_only=False,
+                        is_liquidation=False,
                     )
 
                 if execution_type in {"TRADE", "PARTIALLY_FILLED"}:
                     yield ExchangeFillUpdate(
-                        order_id=str(payload.get("c", "")),
-                        fill_id=str(payload.get("t", "")),
-                        price=float(payload.get("L", 0.0)),
-                        quantity=float(payload.get("l", 0.0)),
-                        fee=float(payload.get("n", 0.0)),
+                        exchange_order_id=str(payload.get("i", "")),
+                        trade_id=str(payload.get("t", "")),
+                        fill_price=float(payload.get("L", 0.0)),
+                        fill_quantity=float(payload.get("l", 0.0)),
+                        fill_fee=float(payload.get("n", 0.0)),
                         fee_asset=str(payload.get("N", "")),
+                        liquidity_side=(
+                            "MAKER"
+                            if bool(payload.get("m", False))
+                            else "TAKER"
+                        ),
+                        position_side="BOTH",
+                        reduce_only=False,
+                        is_liquidation=False,
                     )
 
             except Exception as exc:
@@ -282,10 +265,6 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
                 )
 
     async def _create_listen_key(self) -> str:
-        """
-        Create Binance user stream listen key.
-        """
-
         if self._http_session is None:
             raise RuntimeError("binance_http_session_not_initialized")
 
@@ -319,10 +298,6 @@ class BinanceExchangeAdapter(BaseExchangeAdapter):
         return listen_key
 
     async def _check_connection_health(self) -> bool:
-        """
-        Binance websocket heartbeat validation.
-        """
-
         return (
             self._websocket is not None
             and not self._websocket.closed
