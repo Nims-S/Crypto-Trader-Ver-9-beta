@@ -9,12 +9,12 @@ from uuid import uuid4
 
 import aiohttp
 
-from ver9.events.execution_events import OrderAccepted
-from ver9.events.execution_events import OrderRejected
-from ver9.events.execution_events import OrderSubmitted
-from ver9.events.execution_models import ExchangeExecutionResult
-from ver9.events.execution_models import ExchangeFillUpdate
-from ver9.events.execution_models import ExchangeOrderUpdate
+from ver9.events_execution_events import OrderAccepted
+from ver9.events_execution_events import OrderRejected
+from ver9.events_execution_events import OrderSubmitted
+from ver9.events_execution_models import ExchangeExecutionResult
+from ver9.events_execution_models import ExchangeFillUpdate
+from ver9.events_execution_models import ExchangeOrderUpdate
 from ver9.exchanges.base.adapter import BaseExchangeAdapter
 
 

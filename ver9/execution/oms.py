@@ -7,9 +7,11 @@ from ver9.events.execution_events import FillReceived
 from ver9.events.execution_events import OrderAccepted
 from ver9.events.execution_events import OrderRejected
 from ver9.events.execution_events import OrderSubmitted
-from ver9.events.execution_models import ExchangeExecutionResult
-from ver9.events.execution_models import ExchangeFillUpdate
-from ver9.events.execution_models import ExchangeOrderUpdate
+from ver9.events.execution_models import (
+    ExchangeExecutionResult,
+    ExchangeOrderUpdate,
+    ExchangeFillUpdate,
+)
 from ver9.exchanges.base.adapter import BaseExchangeAdapter
 from ver9.observability.logging import AsyncJsonLogger
 from ver9.observability.metrics import MetricsCollector
