@@ -1,1 +1,1 @@
-"""Execution interface contracts."""
+"""Execution orchestration interfaces."""

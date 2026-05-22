@@ -1,1 +1,1 @@
-"""Metrics interfaces."""
+"""Metrics collection interfaces."""

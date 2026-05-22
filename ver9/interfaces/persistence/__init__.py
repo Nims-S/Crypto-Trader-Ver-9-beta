@@ -1,1 +1,1 @@
-"""Persistence interface contracts."""
+"""Persistence layer interfaces."""

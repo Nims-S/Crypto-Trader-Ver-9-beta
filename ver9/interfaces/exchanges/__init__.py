@@ -1,1 +1,1 @@
-"""Exchange interface contracts."""
+"""Exchange adapter interfaces."""

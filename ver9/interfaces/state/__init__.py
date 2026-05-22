@@ -1,1 +1,1 @@
-"""State access interfaces."""
+"""State management interfaces."""
