@@ -1,0 +1,44 @@
+[importlinter]
+root_package = ver9
+
+[contract:domain_no_imports]
+name = Domain layer must not import runtime, execution, exchanges, or interfaces
+type = forbidden
+source_modules = 
+    ver9.domain
+forbidden_modules = 
+    ver9.runtime
+    ver9.execution
+    ver9.exchanges
+    ver9.interfaces
+    ver9.observability
+    ver9.portfolio
+    ver9.persistence
+
+[contract:interfaces_only_domain]
+name = Interfaces layer only depends on domain
+type = forbidden
+source_modules = 
+    ver9.interfaces
+forbidden_modules = 
+    ver9.runtime
+    ver9.execution
+    ver9.exchanges
+    ver9.portfolio
+    ver9.persistence
+
+[contract:execution_no_runtime]
+name = Execution layer must not import runtime
+type = forbidden
+source_modules = 
+    ver9.execution
+forbidden_modules = 
+    ver9.runtime
+
+[contract:exchanges_no_runtime
+name = Exchanges layer must not import runtime
+type = forbidden
+source_modules = 
+    ver9.exchanges
+forbidden_modules = 
+    ver9.runtime
