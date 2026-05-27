@@ -1,44 +1,68 @@
-[importlinter]
-root_package = ver9
+# Import Linter Configuration - Phase 1 Migration
+# Enforces strict dependency boundaries
 
-[contract:domain_no_imports]
-name = Domain layer must not import runtime, execution, exchanges, or interfaces
+[settings]
+root_packages = ver9
+
+[contract:domain_isolation]
+name = Domain layer must have zero external dependencies
 type = forbidden
-source_modules = 
-    ver9.domain
-forbidden_modules = 
+source_modules = ver9.domain
+forbidden_modules =
     ver9.runtime
-    ver9.execution
     ver9.exchanges
+    ver9.execution
     ver9.interfaces
     ver9.observability
     ver9.portfolio
     ver9.persistence
 
-[contract:interfaces_only_domain]
-name = Interfaces layer only depends on domain
+[contract:interfaces_isolation]
+name = Interfaces can only import domain
 type = forbidden
-source_modules = 
-    ver9.interfaces
-forbidden_modules = 
+source_modules = ver9.interfaces
+forbidden_modules =
     ver9.runtime
-    ver9.execution
     ver9.exchanges
+    ver9.execution
+    ver9.observability
     ver9.portfolio
     ver9.persistence
 
-[contract:execution_no_runtime]
-name = Execution layer must not import runtime
+[contract:execution_isolation]
+name = Execution can only import domain and interfaces
 type = forbidden
-source_modules = 
-    ver9.execution
-forbidden_modules = 
+source_modules = ver9.execution
+forbidden_modules =
     ver9.runtime
+    ver9.observability
+    ver9.persistence
 
-[contract:exchanges_no_runtime
-name = Exchanges layer must not import runtime
+[contract:exchanges_isolation]
+name = Exchanges can only import domain and interfaces
 type = forbidden
-source_modules = 
-    ver9.exchanges
-forbidden_modules = 
+source_modules = ver9.exchanges
+forbidden_modules =
     ver9.runtime
+    ver9.execution
+    ver9.observability
+    ver9.persistence
+
+[contract:portfolio_isolation]
+name = Portfolio (risk) can only import domain and interfaces
+type = forbidden
+source_modules = ver9.portfolio
+forbidden_modules =
+    ver9.runtime
+    ver9.exchanges
+    ver9.observability
+    ver9.persistence
+
+[contract:no_runtime_reverse]
+name = Runtime must not be imported by domain, interfaces, or exchanges
+type = forbidden
+source_modules =
+    ver9.domain
+    ver9.interfaces
+    ver9.exchanges
+forbidden_modules = ver9.runtime
