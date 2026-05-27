@@ -1,62 +1,69 @@
-[build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "Crypto-Trader-Ver-9-beta"
-version = "9.0.0b0"
-description = "Clean event-driven beta infrastructure for the Ver9 algorithmic trading runtime."
-readme = "README.md"
-requires-python = ">=3.11"
-license = { text = "Proprietary" }
-authors = [
-    { name = "Nims-S" }
-]
-keywords = [
-    "algorithmic-trading",
-    "event-driven",
-    "crypto",
-    "runtime-kernel",
-    "oms",
-    "exchange-adapters"
-]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Typing :: Typed",
-    "Intended Audience :: Financial and Insurance Industry",
-    "Topic :: Office/Business :: Financial :: Investment"
-]
-
-dependencies = [
-    "pydantic>=2.7",
-    "msgspec>=0.18",
-    "aiohttp>=3.9",
-    "websockets>=12.0"
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.23",
-    "black>=24.0",
-    "ruff>=0.5",
-    "mypy>=1.10"
-]
-
-[tool.setuptools.packages.find]
-include = ["ver9*"]
-
-[tool.black]
-line-length = 88
-target-version = ["py311"]
-
+# Ruff Configuration for Code Quality
 [tool.ruff]
-line-length = 88
+line-length = 100
 target-version = "py311"
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "D",    # pydocstyle
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+]
+
+ignore = [
+    "D100",  # Missing module docstring
+    "D104",  # Missing package docstring
+    "E501",  # Line too long (handled by black)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["ver9"]
+known-third-party = []
+
+# Black Configuration
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+# Mypy Configuration
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_optional = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
