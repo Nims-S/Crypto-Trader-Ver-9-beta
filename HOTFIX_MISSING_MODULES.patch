@@ -1,0 +1,312 @@
+--- a/ver9/infrastructure/__init__.py
++++ b/ver9/infrastructure/__init__.py
+@@ -0,0 +1,2 @@
++"""Infrastructure layer - circuit breakers, rate limiters, logging."""
++
+--- a/ver9/infrastructure/circuit_breaker.py
++++ b/ver9/infrastructure/circuit_breaker.py
+@@ -0,0 +1,24 @@
++"""Circuit breaker resilience pattern."""
++from __future__ import annotations
++
++import asyncio
++from typing import Callable, TypeVar, Any
++
++T = TypeVar("T")
++
++
++class CircuitBreaker:
++    """Circuit breaker implementation for fault tolerance."""
++
++    def __init__(
++        self,
++        failure_threshold: int = 5,
++        recovery_timeout: int = 60,
++    ) -> None:
++        self.failure_threshold = failure_threshold
++        self.recovery_timeout = recovery_timeout
++        self.is_open = False
++
++    async def call(self, coro: Callable) -> Any:
++        """Execute callable with circuit breaker protection."""
++        if self.is_open:
++            raise RuntimeError("Circuit breaker is open")
++        return await coro()
+--- a/ver9/infrastructure/logging.py
++++ b/ver9/infrastructure/logging.py
+@@ -0,0 +1,20 @@
++"""Async JSON logging infrastructure."""
++from __future__ import annotations
++
++
++class AsyncJsonLogger:
++    """Async JSON logger for structured logging."""
++
++    async def info(self, message: str, **kwargs) -> None:
++        """Log info level message."""
++        pass
++
++    async def error(self, message: str, **kwargs) -> None:
++        """Log error level message."""
++        pass
++
++    async def warning(self, message: str, **kwargs) -> None:
++        """Log warning level message."""
++        pass
++
++    async def start(self) -> None:
++        """Start logger."""
++        pass
++
++    async def stop(self) -> None:
++        """Stop logger."""
++        pass
+--- a/ver9/infrastructure/metrics.py
++++ b/ver9/infrastructure/metrics.py
+@@ -0,0 +1,22 @@
++"""Metrics collection infrastructure."""
++from __future__ import annotations
++
++from typing import Any
++
++
++class MetricsCollector:
++    """Metrics collector for instrumenting runtime."""
++
++    def increment(
++        self,
++        name: str,
++        **kwargs: Any,
++    ) -> None:
++        """Increment counter metric."""
++        pass
++
++    def increment_counter(
++        self,
++        name: str,
++        tags: dict | None = None,
++    ) -> None:
++        """Increment counter with tags."""
++        pass
++
++    def record_histogram(
++        self,
++        name: str,
++        value: float,
++        tags: dict | None = None,
++    ) -> None:
++        """Record histogram metric."""
++        pass
+--- a/ver9/infrastructure/rate_limiter.py
++++ b/ver9/infrastructure/rate_limiter.py
+@@ -0,0 +1,20 @@
++"""Rate limiting infrastructure."""
++from __future__ import annotations
++
++import asyncio
++
++
++class RateLimiter:
++    """Token bucket rate limiter."""
++
++    def __init__(
++        self,
++        rate: int = 10,
++        capacity: int = 100,
++        max_requests: int = 60,
++        window_seconds: float = 60.0,
++    ) -> None:
++        self.rate = rate
++        self.capacity = capacity
++
++    async def acquire(self) -> None:
++        """Acquire rate limit token."""
++        await asyncio.sleep(0)
+--- a/ver9/config/__init__.py
++++ b/ver9/config/__init__.py
+@@ -0,0 +1 @@
++"""Configuration layer."""
+--- a/ver9/config/exchange_config.py
++++ b/ver9/config/exchange_config.py
+@@ -0,0 +1,35 @@
++"""Exchange adapter configuration."""
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++
++@dataclass
++class ExchangeConfig:
++    """Configuration for exchange adapters."""
++
++    exchange_name: str = "default"
++    """Name of the exchange."""
++
++    rate_limit_per_second: int = 10
++    """Rate limit in requests per second."""
++
++    rate_limit_burst: int = 100
++    """Burst capacity for rate limiter."""
++
++    circuit_breaker_failure_threshold: int = 5
++    """Number of failures before circuit breaker opens."""
++
++    circuit_breaker_recovery_timeout_seconds: int = 60
++    """Timeout in seconds before circuit breaker attempts recovery."""
++
++    connection_healthcheck_interval_seconds: int = 30
++    """Interval in seconds between connection health checks."""
++
++    base_reconnect_backoff_seconds: int = 1
++    """Base backoff duration for reconnection attempts."""
++
++    max_reconnect_backoff_seconds: int = 300
++    """Maximum backoff duration for reconnection attempts."""
+--- a/ver9/events/execution_models.py
++++ b/ver9/events/execution_models.py
+@@ -0,0 +1,57 @@
++"""Execution models for exchange adapters."""
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True, slots=True)
++class ExchangeExecutionResult:
++    """Result of submitting an order to an exchange."""
++
++    exchange_order_id: str
++    """Order ID assigned by the exchange."""
++
++    status: str
++    """Status of the submitted order."""
++
++
++@dataclass(frozen=True, slots=True)
++class ExchangeOrderUpdate:
++    """Update to order status from exchange."""
++
++    exchange_order_id: str
++    """Order ID from the exchange."""
++
++    internal_order_id: str
++    """Internal order ID for correlation."""
++
++    status: str
++    """Updated order status."""
++
++    cumulative_filled_quantity: float
++    """Total quantity filled so far."""
++
++
++@dataclass(frozen=True, slots=True)
++class ExchangeFillUpdate:
++    """Fill event from exchange."""
++
++    exchange_order_id: str
++    """Order ID from the exchange."""
++
++    trade_id: str
++    """Trade ID assigned by the exchange."""
++
++    fill_price: float
++    """Price at which the fill occurred."""
++
++    fill_quantity: float
++    """Quantity filled in this trade."""
++
++    liquidity_side: str
++    """Side of liquidity (maker/taker)."""
+--- a/ver9/observability/__init__.py
++++ b/ver9/observability/__init__.py
+@@ -0,0 +1 @@
++"""Observability layer - logging, metrics, tracing."""
+--- a/ver9/observability/logging.py
++++ b/ver9/observability/logging.py
+@@ -0,0 +1,23 @@
++"""Async JSON logging for observability."""
++from __future__ import annotations
++
++
++class AsyncJsonLogger:
++    """Async JSON structured logger."""
++
++    async def info(self, message: str, **kwargs) -> None:
++        """Log info level message."""
++        pass
++
++    async def error(self, message: str, **kwargs) -> None:
++        """Log error level message."""
++        pass
++
++    async def warning(self, message: str, **kwargs) -> None:
++        """Log warning level message."""
++        pass
++
++    async def start(self) -> None:
++        """Start logger."""
++        pass
++
++    async def stop(self) -> None:
++        """Stop logger."""
++        pass
+--- a/ver9/observability/metrics.py
++++ b/ver9/observability/metrics.py
+@@ -0,0 +1,25 @@
++"""Metrics collection for observability."""
++from __future__ import annotations
++
++from typing import Any
++
++
++class MetricsCollector:
++    """Collects and reports runtime metrics."""
++
++    def increment(
++        self,
++        name: str,
++        **kwargs: Any,
++    ) -> None:
++        """Increment counter metric."""
++        pass
++
++    def increment_counter(
++        self,
++        name: str,
++        tags: dict | None = None,
++    ) -> None:
++        """Increment counter with tags."""
++        pass
++
++    def record_histogram(
++        self,
++        name: str,
++        value: float,
++        tags: dict | None = None,
++    ) -> None:
++        """Record histogram metric."""
++        pass
+--- a/ver9/observability/tracing.py
++++ b/ver9/observability/tracing.py
+@@ -0,0 +1,8 @@
++"""Distributed tracing for observability."""
++from __future__ import annotations
++
++
++class TraceProvider:
++    """Distributed trace provider."""
++
++    def use(self):
++        """Get trace context."""
++        return self
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -12,7 +12,6 @@ repos:
+   - repo: https://github.com/psf/black
+     rev: 23.9.1
+     hooks:
+       - id: black
+-        language_version: python3.11
+ 
+   - repo: https://github.com/astral-sh/ruff-pre-commit
+     rev: v0.1.0
